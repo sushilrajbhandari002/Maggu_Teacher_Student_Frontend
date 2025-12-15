@@ -120,13 +120,13 @@ export function LoginPage({ onLogin }: LoginPageProps) {
         {!selectedRole ? (
           <div className="space-y-4">
             <h2 className="text-center text-gray-700 mb-6">Select Login Type</h2>
-            <Button
+            {/* <Button
               onClick={() => setSelectedRole('admin')}
               className="w-full h-16 bg-purple-600 hover:bg-purple-700"
             >
               <Shield className="size-5 mr-2" />
               Login as Super Admin
-            </Button>
+            </Button> */}
             <Button
               onClick={() => setSelectedRole('teacher')}
               className="w-full h-16 bg-indigo-600 hover:bg-indigo-700"
