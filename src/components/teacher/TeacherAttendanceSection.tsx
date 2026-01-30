@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { User } from '../../App';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -6,92 +6,38 @@ import { CheckSquare, Clock, Users, Eye, Check, X, Calendar as CalendarIcon } fr
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { toast } from 'sonner@2.0.3';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
+import { useTeacherData } from './TeacherDataContext';
 
 interface TeacherAttendanceSectionProps {
   user: User;
 }
 
-const mockClasses = ['Class 10-A', 'Class 10-B', 'Class 9-A', 'Class 9-B'];
-
-const mockStudentsForAttendance = [
-  { id: 1, name: 'Aditya Sharma', rollNo: '101', status: 'present' },
-  { id: 2, name: 'Priya Patel', rollNo: '102', status: 'present' },
-  { id: 3, name: 'Rahul Kumar', rollNo: '103', status: 'absent' },
-  { id: 4, name: 'Sneha Singh', rollNo: '104', status: 'present' },
-  { id: 5, name: 'Arjun Verma', rollNo: '105', status: 'present' },
-  { id: 6, name: 'Ananya Gupta', rollNo: '106', status: 'present' },
-  { id: 7, name: 'Vikram Joshi', rollNo: '107', status: 'present' },
-  { id: 8, name: 'Kavya Thakur', rollNo: '108', status: 'absent' }
-];
-
-const mockPendingRequests = [
-  {
-    id: 1,
-    studentName: 'Rahul Kumar',
-    rollNo: '103',
-    class: 'Class 10-A',
-    date: '2025-12-12',
-    time: '8:15 AM',
-    location: '27.7172° N, 85.3240° E',
-    photoUrl: null,
-    reason: 'Was present but forgot to mark'
-  },
-  {
-    id: 2,
-    studentName: 'Arjun Verma',
-    rollNo: '105',
-    class: 'Class 10-A',
-    date: '2025-12-11',
-    time: '8:20 AM',
-    location: '27.7175° N, 85.3245° E',
-    photoUrl: null,
-    reason: 'App was not working'
-  }
-];
-
-const mockStudentAttendanceRecords = [
-  {
-    studentName: 'Aditya Sharma',
-    rollNo: '101',
-    class: 'Class 10-A',
-    records: [
-      { date: '2025-12-12', status: 'Present' },
-      { date: '2025-12-11', status: 'Present' },
-      { date: '2025-12-10', status: 'Present' },
-      { date: '2025-12-09', status: 'Absent' },
-      { date: '2025-12-08', status: 'Present' },
-    ],
-    totalPresent: 18,
-    totalAbsent: 2,
-    percentage: 90
-  },
-  {
-    studentName: 'Priya Patel',
-    rollNo: '102',
-    class: 'Class 10-A',
-    records: [
-      { date: '2025-12-12', status: 'Present' },
-      { date: '2025-12-11', status: 'Present' },
-      { date: '2025-12-10', status: 'Present' },
-      { date: '2025-12-09', status: 'Present' },
-      { date: '2025-12-08', status: 'Present' },
-    ],
-    totalPresent: 20,
-    totalAbsent: 0,
-    percentage: 100
-  }
-];
-
 export function TeacherAttendanceSection({ user }: TeacherAttendanceSectionProps) {
   const [view, setView] = useState<'mark' | 'pending' | 'details'>('mark');
-  const [selectedClass, setSelectedClass] = useState(mockClasses[0]);
-  const [attendance, setAttendance] = useState<Record<number, 'present' | 'absent'>>(
-    mockStudentsForAttendance.reduce((acc, student) => ({
-      ...acc,
-      [student.id]: student.status as 'present' | 'absent'
-    }), {})
-  );
-  const [viewingStudent, setViewingStudent] = useState<typeof mockStudentAttendanceRecords[0] | null>(null);
+  const data = useTeacherData();
+  const [selectedClass, setSelectedClass] = useState(data?.attendance?.classes?.[0] ?? '');
+  const [attendance, setAttendance] = useState<Record<number, 'present' | 'absent'>>({});
+  const [viewingStudent, setViewingStudent] = useState<typeof data.attendance.details[0] | null>(null);
+
+  if (!data || !data.attendance) {
+    return <div className="p-4 text-gray-500">Loading attendance data...</div>;
+  }
+
+  useEffect(() => {
+    if (data?.attendance?.students) {
+      const initial = data.attendance.students.reduce(
+        (acc, student) => ({ ...acc, [student.id]: student.status }),
+        {}
+      );
+      setAttendance(initial);
+    }
+  }, [data?.attendance?.students]);
+
+  useEffect(() => {
+    if (!selectedClass && data?.attendance?.classes?.length) {
+      setSelectedClass(data.attendance.classes[0]);
+    }
+  }, [data?.attendance?.classes, selectedClass]);
 
   const toggleAttendance = (studentId: number) => {
     setAttendance(prev => ({
@@ -128,7 +74,7 @@ export function TeacherAttendanceSection({ user }: TeacherAttendanceSectionProps
           className={view === 'pending' ? 'bg-indigo-600 hover:bg-indigo-700' : ''}
         >
           <Clock className="size-4 mr-2" />
-          Pending ({mockPendingRequests.length})
+          Pending ({data?.attendance?.pendingRequests?.length ?? 0})
         </Button>
         <Button
           variant={view === 'details' ? 'default' : 'outline'}
@@ -159,7 +105,7 @@ export function TeacherAttendanceSection({ user }: TeacherAttendanceSectionProps
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {mockClasses.map((cls) => (
+                  {(data?.attendance?.classes ?? []).map((cls) => (
                     <SelectItem key={cls} value={cls}>
                       {cls}
                     </SelectItem>
@@ -181,9 +127,11 @@ export function TeacherAttendanceSection({ user }: TeacherAttendanceSectionProps
 
             {/* Students List */}
             <div className="space-y-2">
-              {mockStudentsForAttendance.map((student) => {
-                const isPresent = attendance[student.id] === 'present';
-                return (
+              {data.attendance.students
+                .filter((student) => !selectedClass || student.class === selectedClass || !student.class)
+                .map((student) => {
+                  const isPresent = attendance[student.id] === 'present';
+                  return (
                   <div
                     key={student.id}
                     className={`p-3 rounded-lg border transition-colors ${
@@ -229,7 +177,7 @@ export function TeacherAttendanceSection({ user }: TeacherAttendanceSectionProps
             <div className="p-4 bg-gray-50 rounded-lg border">
               <div className="grid grid-cols-3 gap-3 text-center">
                 <div>
-                  <p className="text-2xl text-gray-900">{mockStudentsForAttendance.length}</p>
+                  <p className="text-2xl text-gray-900">{data?.attendance?.students?.length ?? 0}</p>
                   <p className="text-sm text-gray-600">Total</p>
                 </div>
                 <div>
@@ -260,17 +208,17 @@ export function TeacherAttendanceSection({ user }: TeacherAttendanceSectionProps
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Clock className="size-5 text-indigo-600" />
-              Pending Requests ({mockPendingRequests.length})
+              Pending Requests ({data.attendance.pendingRequests.length})
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {mockPendingRequests.length === 0 ? (
+              {(data?.attendance?.pendingRequests?.length ?? 0) === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 <Clock className="size-12 mx-auto mb-2 opacity-50" />
                 <p>No pending attendance requests</p>
               </div>
             ) : (
-              mockPendingRequests.map((request) => (
+                (data?.attendance?.pendingRequests ?? []).map((request) => (
                 <div key={request.id} className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
                   <div className="flex items-start justify-between mb-3">
                     <div>
@@ -325,7 +273,7 @@ export function TeacherAttendanceSection({ user }: TeacherAttendanceSectionProps
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {mockStudentAttendanceRecords.map((student, idx) => (
+            {(data?.attendance?.details ?? []).map((student, idx) => (
               <div key={idx} className="p-4 bg-white rounded-lg border">
                 <div className="flex items-center justify-between mb-3">
                   <div>

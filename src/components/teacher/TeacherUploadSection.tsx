@@ -7,69 +7,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
 import { toast } from 'sonner@2.0.3';
+import { useTeacherData } from './TeacherDataContext';
+import { apiFetchFormData } from '../../lib/api';
 
 interface TeacherUploadSectionProps {
   user: User;
+  onRefresh: () => void;
 }
 
-const mockClasses = ['Class 10', 'Class 9', 'Class 8', 'Class 7', 'Class 6'];
-const mockSubjects = ['Mathematics', 'English', 'Science', 'Social Studies', 'Hindi', 'Computer'];
-
-const mockUploadedMaterials = [
-  {
-    id: 1,
-    title: 'Quadratic Equations - Chapter Notes',
-    subject: 'Mathematics',
-    class: 'Class 10',
-    type: 'PDF',
-    size: '2.5 MB',
-    uploadedOn: '2025-12-10',
-    downloads: 45
-  },
-  {
-    id: 2,
-    title: 'Trigonometry - Practice Questions',
-    subject: 'Mathematics',
-    class: 'Class 10',
-    type: 'PDF',
-    size: '1.2 MB',
-    uploadedOn: '2025-12-04',
-    downloads: 38
-  },
-  {
-    id: 3,
-    title: 'Algebra Fundamentals',
-    subject: 'Mathematics',
-    class: 'Class 9',
-    type: 'PDF',
-    size: '2.1 MB',
-    uploadedOn: '2025-12-02',
-    downloads: 32
-  },
-  {
-    id: 4,
-    title: 'Geometry Basic Concepts',
-    subject: 'Mathematics',
-    class: 'Class 9',
-    type: 'DOCX',
-    size: '1.8 MB',
-    uploadedOn: '2025-11-28',
-    downloads: 29
-  },
-  {
-    id: 5,
-    title: 'Statistics and Probability',
-    subject: 'Mathematics',
-    class: 'Class 10',
-    type: 'PPTX',
-    size: '3.5 MB',
-    uploadedOn: '2025-11-25',
-    downloads: 41
-  }
-];
-
-export function TeacherUploadSection({ user }: TeacherUploadSectionProps) {
+export function TeacherUploadSection({ user, onRefresh }: TeacherUploadSectionProps) {
+  const data = useTeacherData();
   const [view, setView] = useState<'upload' | 'existing'>('upload');
+
+  if (!data || !data.materials) {
+    return <div className="p-4 text-gray-500">Loading materials data...</div>;
+  }
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('');
   const [title, setTitle] = useState('');
@@ -90,23 +42,37 @@ export function TeacherUploadSection({ user }: TeacherUploadSectionProps) {
     }
   };
 
-  const handleUpload = () => {
+  const handleUpload = async () => {
     if (!selectedClass || !selectedSubject || !title || !selectedFile) {
       toast.error('Please fill all required fields');
       return;
     }
 
-    // Mock upload
-    toast.success('Study material uploaded successfully!');
-    
-    // Reset form
-    setSelectedClass('');
-    setSelectedSubject('');
-    setTitle('');
-    setDescription('');
-    setSelectedFile(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+    try {
+      const formData = new FormData();
+      formData.append('title', title);
+      formData.append('subject', selectedSubject);
+      formData.append('className', selectedClass);
+      formData.append(
+        'size',
+        `${(selectedFile.size / (1024 * 1024)).toFixed(2)} MB`
+      );
+      formData.append('file', selectedFile);
+
+      await apiFetchFormData(`/teachers/${user.id}/materials`, formData);
+      toast.success('Study material uploaded successfully!');
+      onRefresh();
+
+      setSelectedClass('');
+      setSelectedSubject('');
+      setTitle('');
+      setDescription('');
+      setSelectedFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to upload material');
     }
   };
 
@@ -145,7 +111,7 @@ export function TeacherUploadSection({ user }: TeacherUploadSectionProps) {
           className={view === 'existing' ? 'bg-indigo-600 hover:bg-indigo-700' : ''}
         >
           <FileText className="size-4 mr-2" />
-          My Materials ({mockUploadedMaterials.length})
+          My Materials ({data?.materials?.uploads?.length ?? 0})
         </Button>
       </div>
 
@@ -169,7 +135,7 @@ export function TeacherUploadSection({ user }: TeacherUploadSectionProps) {
                   <SelectValue placeholder="Select class" />
                 </SelectTrigger>
                 <SelectContent>
-                  {mockClasses.map((cls) => (
+                  {(data?.materials?.classes ?? []).map((cls) => (
                     <SelectItem key={cls} value={cls}>
                       {cls}
                     </SelectItem>
@@ -188,7 +154,7 @@ export function TeacherUploadSection({ user }: TeacherUploadSectionProps) {
                   <SelectValue placeholder="Select subject" />
                 </SelectTrigger>
                 <SelectContent>
-                  {mockSubjects.map((subject) => (
+                  {(data?.materials?.subjects ?? []).map((subject) => (
                     <SelectItem key={subject} value={subject}>
                       {subject}
                     </SelectItem>
@@ -291,13 +257,13 @@ export function TeacherUploadSection({ user }: TeacherUploadSectionProps) {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {mockUploadedMaterials.length === 0 ? (
+            {(data?.materials?.uploads?.length ?? 0) === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 <FileText className="size-12 mx-auto mb-2 opacity-50" />
                 <p>No materials uploaded yet</p>
               </div>
             ) : (
-              mockUploadedMaterials.map((material) => (
+              (data?.materials?.uploads ?? []).map((material) => (
                 <div key={material.id} className="p-4 bg-white rounded-lg border">
                   <div className="flex items-start gap-3">
                     <div className="flex-shrink-0">
@@ -319,7 +285,7 @@ export function TeacherUploadSection({ user }: TeacherUploadSectionProps) {
                       <div className="text-sm text-gray-600 space-y-1">
                         <p>Size: {material.size}</p>
                         <p>Uploaded: {new Date(material.uploadedOn).toLocaleDateString()}</p>
-                        <p>Downloads: {material.downloads}</p>
+                        <p>Uploaded By: {material.uploadedByName}</p>
                       </div>
                     </div>
                   </div>

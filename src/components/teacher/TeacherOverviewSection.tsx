@@ -3,57 +3,33 @@ import { User } from '../../App';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Bell, Calendar as CalendarIcon, Users, CheckSquare, FileText } from 'lucide-react';
 import { Calendar } from '../ui/calendar';
+import { useTeacherData } from './TeacherDataContext';
 
 interface TeacherOverviewSectionProps {
   user: User;
 }
 
-const mockNotices = [
-  {
-    id: 1,
-    title: 'Staff Meeting - December 15th',
-    content: 'Monthly staff meeting scheduled at 3 PM in the conference room.',
-    date: '2025-12-10',
-    priority: 'High'
-  },
-  {
-    id: 2,
-    title: 'Exam Schedule Released',
-    content: 'Half yearly examination schedule has been released. Please check the notice board.',
-    date: '2025-12-09',
-    priority: 'Medium'
-  },
-  {
-    id: 3,
-    title: 'Professional Development Workshop',
-    content: 'Workshop on modern teaching methodologies on December 20th.',
-    date: '2025-12-08',
-    priority: 'Medium'
-  }
-];
-
-const mockStats = [
-  { label: 'Total Classes', value: '5', icon: Users, color: 'bg-blue-50 text-blue-600' },
-  { label: 'Total Students', value: '142', icon: Users, color: 'bg-green-50 text-green-600' },
-  { label: 'Pending Attendance', value: '3', icon: CheckSquare, color: 'bg-orange-50 text-orange-600' },
-  { label: 'Materials Uploaded', value: '28', icon: FileText, color: 'bg-purple-50 text-purple-600' }
-];
-
-const mockUpcomingClasses = [
-  { time: '8:00 AM', class: 'Class 10-A', subject: 'Mathematics', room: 'Room 201' },
-  { time: '9:00 AM', class: 'Class 10-B', subject: 'Mathematics', room: 'Room 202' },
-  { time: '10:30 AM', class: 'Class 9-A', subject: 'Mathematics', room: 'Room 201' },
-  { time: '11:30 AM', class: 'Class 9-B', subject: 'Mathematics', room: 'Room 203' }
-];
-
 export function TeacherOverviewSection({ user }: TeacherOverviewSectionProps) {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const data = useTeacherData();
+
+  const statConfig = [
+    { label: 'Total Classes', icon: Users, color: 'bg-blue-50 text-blue-600' },
+    { label: 'Total Students', icon: Users, color: 'bg-green-50 text-green-600' },
+    { label: 'Pending Attendance', icon: CheckSquare, color: 'bg-orange-50 text-orange-600' },
+    { label: 'Materials Uploaded', icon: FileText, color: 'bg-purple-50 text-purple-600' },
+  ];
+
+  const stats = statConfig.map((stat, index) => ({
+    ...stat,
+    value: data.overview.stats[index]?.value ?? '0',
+  }));
 
   return (
     <div className="space-y-4">
       {/* Stats Grid */}
       <div className="grid grid-cols-2 gap-3">
-        {mockStats.map((stat, idx) => {
+        {stats.map((stat, idx) => {
           const Icon = stat.icon;
           return (
             <Card key={idx}>
@@ -82,7 +58,7 @@ export function TeacherOverviewSection({ user }: TeacherOverviewSectionProps) {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          {mockUpcomingClasses.map((cls, idx) => (
+          {data.overview.schedule.map((cls, idx) => (
             <div key={idx} className="p-3 bg-indigo-50 rounded-lg border border-indigo-200">
               <div className="flex items-center justify-between mb-1">
                 <span className="text-indigo-600">{cls.time}</span>
@@ -106,7 +82,7 @@ export function TeacherOverviewSection({ user }: TeacherOverviewSectionProps) {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {mockNotices.map((notice) => (
+          {data.overview.notices.map((notice) => (
             <div key={notice.id} className="p-3 bg-gray-50 rounded-lg border">
               <div className="flex items-start justify-between mb-1">
                 <h3 className="text-gray-900">{notice.title}</h3>

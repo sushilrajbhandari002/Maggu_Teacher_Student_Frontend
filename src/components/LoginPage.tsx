@@ -4,85 +4,18 @@ import { Input } from './ui/input';
 import { Card } from './ui/card';
 import { GraduationCap, User, Shield } from 'lucide-react';
 import { User as UserType } from '../App';
+import { API_BASE_URL } from '../lib/api';
 
 interface LoginPageProps {
   onLogin: (user: UserType) => void;
 }
-
-// Mock data for demo purposes
-const mockUsers = {
-  admin: {
-    id: 'admin1',
-    email: 'admin@sushilschool.edu',
-    password: 'admin123',
-    role: 'admin' as const,
-    name: 'Super Admin',
-    needsPasswordChange: false
-  },
-  teachers: [
-    {
-      id: 't1',
-      email: 'john.doe@sushilschool.edu',
-      username: 'john.doe',
-      password: 'teacher123',
-      role: 'teacher' as const,
-      name: 'John Doe',
-      teacherId: 'T001',
-      phone: '+1234567890',
-      address: '123 Main St, City',
-      classTeacherOf: 'Class 10A',
-      assignedClasses: ['Class 10A', 'Class 9B', 'Class 8C'],
-      needsPasswordChange: true
-    },
-    {
-      id: 't2',
-      email: 'sarah.smith@sushilschool.edu',
-      username: 'sarah.smith',
-      password: 'teacher123',
-      role: 'teacher' as const,
-      name: 'Sarah Smith',
-      teacherId: 'T002',
-      phone: '+1234567891',
-      address: '456 Oak Ave, City',
-      assignedClasses: ['Class 7A', 'Class 6B'],
-      needsPasswordChange: false
-    }
-  ],
-  students: [
-    {
-      id: 's1',
-      email: 'alice.johnson@student.sushilschool.edu',
-      username: 'alice.johnson',
-      password: 'student123',
-      role: 'student' as const,
-      name: 'Alice Johnson',
-      phone: '+1234567892',
-      address: '789 Pine Rd, City',
-      class: 'Class 10A',
-      rollNumber: '101',
-      needsPasswordChange: true
-    },
-    {
-      id: 's2',
-      email: 'bob.wilson@student.sushilschool.edu',
-      username: 'bob.wilson',
-      password: 'student123',
-      role: 'student' as const,
-      name: 'Bob Wilson',
-      phone: '+1234567893',
-      address: '321 Elm St, City',
-      class: 'Class 10A',
-      rollNumber: '102',
-      needsPasswordChange: false
-    }
-  ]
-};
 
 export function LoginPage({ onLogin }: LoginPageProps) {
   const [selectedRole, setSelectedRole] = useState<'teacher' | 'student' | 'admin' | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,19 +26,35 @@ export function LoginPage({ onLogin }: LoginPageProps) {
       return;
     }
 
-    let user;
-    if (selectedRole === 'admin') {
-      user = mockUsers.admin.email === email && mockUsers.admin.password === password ? mockUsers.admin : null;
-    } else {
-      const users = selectedRole === 'teacher' ? mockUsers.teachers : mockUsers.students;
-      user = users.find(u => u.email === email && u.password === password);
-    }
+    const login = async () => {
+      try {
+        setIsSubmitting(true);
+        const response = await fetch(`${API_BASE_URL}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email,
+            password,
+            role: selectedRole,
+          }),
+        });
 
-    if (user) {
-      onLogin(user);
-    } else {
-      setError('Invalid email or password');
-    }
+        if (!response.ok) {
+          const data = await response.json().catch(() => null);
+          throw new Error(data?.message ?? 'Invalid email or password');
+        }
+
+        const data = await response.json();
+        localStorage.setItem('authToken', data.token);
+        onLogin(data.user as UserType);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Unable to login');
+      } finally {
+        setIsSubmitting(false);
+      }
+    };
+
+    void login();
   };
 
   return (
@@ -193,20 +142,18 @@ export function LoginPage({ onLogin }: LoginPageProps) {
               </div>
             )}
 
-            <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700">
-              Login
+            <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700" disabled={isSubmitting}>
+              {isSubmitting ? 'Logging in...' : 'Login'}
             </Button>
 
             <div className="mt-4 p-4 bg-gray-50 rounded-md">
               <p className="text-sm text-gray-600 mb-2">Demo Credentials:</p>
               <p className="text-xs text-gray-500">
-                {selectedRole === 'admin' ? (
-                  <>Admin: admin@sushilschool.edu / admin123</>
-                ) : selectedRole === 'teacher' ? (
-                  <>Teacher: john.doe@sushilschool.edu / teacher123</>
-                ) : (
-                  <>Student: alice.johnson@student.sushilschool.edu / student123</>
-                )}
+                Admin: admin@sushilschool.edu / admin123
+                <br />
+                Teacher: john.doe@sushilschool.edu / teacher123
+                <br />
+                Student: alice.johnson@student.sushilschool.edu / student123
               </p>
             </div>
           </form>

@@ -1,123 +1,100 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { User } from '../../App';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Trophy, TrendingUp, BookOpen } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { apiFetch } from '../../lib/api';
 
 interface StudentAcademicsSectionProps {
   user: User;
 }
 
-const mockExamResults = [
-  {
-    exam: 'Half Yearly Examination 2025',
-    date: '2025-11-15',
-    results: [
-      { subject: 'Mathematics', fullMarks: 100, obtained: 92, grade: 'A+' },
-      { subject: 'English', fullMarks: 100, obtained: 88, grade: 'A+' },
-      { subject: 'Science', fullMarks: 100, obtained: 85, grade: 'A' },
-      { subject: 'Social Studies', fullMarks: 100, obtained: 90, grade: 'A+' },
-      { subject: 'Hindi', fullMarks: 100, obtained: 82, grade: 'A' },
-      { subject: 'Computer', fullMarks: 50, obtained: 45, grade: 'A+' }
-    ],
-    totalObtained: 482,
-    totalMarks: 550,
-    percentage: 87.6,
-    rank: 3
-  },
-  {
-    exam: 'First Term Examination 2025',
-    date: '2025-09-20',
-    results: [
-      { subject: 'Mathematics', fullMarks: 100, obtained: 88, grade: 'A+' },
-      { subject: 'English', fullMarks: 100, obtained: 85, grade: 'A' },
-      { subject: 'Science', fullMarks: 100, obtained: 90, grade: 'A+' },
-      { subject: 'Social Studies', fullMarks: 100, obtained: 87, grade: 'A+' },
-      { subject: 'Hindi', fullMarks: 100, obtained: 80, grade: 'A' },
-      { subject: 'Computer', fullMarks: 50, obtained: 42, grade: 'A' }
-    ],
-    totalObtained: 472,
-    totalMarks: 550,
-    percentage: 85.8,
-    rank: 5
-  }
-];
+interface ExamResult {
+  subject: string;
+  fullMarks: number;
+  obtained: number;
+  grade: string;
+}
 
-const mockSubjectPerformance = [
-  {
-    subject: 'Mathematics',
-    average: 90,
-    trend: 'up',
-    exams: [
-      { name: 'Half Yearly', marks: 92, outOf: 100 },
-      { name: 'First Term', marks: 88, outOf: 100 },
-      { name: 'Unit Test 2', marks: 85, outOf: 50 },
-      { name: 'Unit Test 1', marks: 42, outOf: 50 }
-    ]
-  },
-  {
-    subject: 'English',
-    average: 86.5,
-    trend: 'up',
-    exams: [
-      { name: 'Half Yearly', marks: 88, outOf: 100 },
-      { name: 'First Term', marks: 85, outOf: 100 },
-      { name: 'Unit Test 2', marks: 40, outOf: 50 },
-      { name: 'Unit Test 1', marks: 38, outOf: 50 }
-    ]
-  },
-  {
-    subject: 'Science',
-    average: 87.5,
-    trend: 'down',
-    exams: [
-      { name: 'Half Yearly', marks: 85, outOf: 100 },
-      { name: 'First Term', marks: 90, outOf: 100 },
-      { name: 'Unit Test 2', marks: 43, outOf: 50 },
-      { name: 'Unit Test 1', marks: 44, outOf: 50 }
-    ]
-  },
-  {
-    subject: 'Social Studies',
-    average: 88.5,
-    trend: 'up',
-    exams: [
-      { name: 'Half Yearly', marks: 90, outOf: 100 },
-      { name: 'First Term', marks: 87, outOf: 100 },
-      { name: 'Unit Test 2', marks: 42, outOf: 50 },
-      { name: 'Unit Test 1', marks: 40, outOf: 50 }
-    ]
-  },
-  {
-    subject: 'Hindi',
-    average: 81,
-    trend: 'up',
-    exams: [
-      { name: 'Half Yearly', marks: 82, outOf: 100 },
-      { name: 'First Term', marks: 80, outOf: 100 },
-      { name: 'Unit Test 2', marks: 38, outOf: 50 },
-      { name: 'Unit Test 1', marks: 37, outOf: 50 }
-    ]
-  },
-  {
-    subject: 'Computer',
-    average: 87,
-    trend: 'up',
-    exams: [
-      { name: 'Half Yearly', marks: 45, outOf: 50 },
-      { name: 'First Term', marks: 42, outOf: 50 },
-      { name: 'Unit Test 2', marks: 23, outOf: 25 },
-      { name: 'Unit Test 1', marks: 22, outOf: 25 }
-    ]
-  }
-];
+interface ExamEntry {
+  exam: string;
+  date: string;
+  results: ExamResult[];
+  totalObtained: number;
+  totalMarks: number;
+  percentage: number;
+  rank: number;
+}
+
+interface SubjectPerformance {
+  subject: string;
+  average: number;
+  trend: 'up' | 'down';
+  exams: { name: string; marks: number; outOf: number }[];
+}
+
+interface AcademicsResponse {
+  exams: ExamEntry[];
+  subjectPerformance: SubjectPerformance[];
+}
 
 export function StudentAcademicsSection({ user }: StudentAcademicsSectionProps) {
-  const [selectedExam, setSelectedExam] = useState(mockExamResults[0].exam);
-  const [selectedSubject, setSelectedSubject] = useState(mockSubjectPerformance[0].subject);
+  const [selectedExam, setSelectedExam] = useState<string | null>(null);
+  const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
+  const [data, setData] = useState<AcademicsResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const currentExam = mockExamResults.find(e => e.exam === selectedExam);
-  const currentSubject = mockSubjectPerformance.find(s => s.subject === selectedSubject);
+  useEffect(() => {
+    setIsLoading(true);
+    setError(null);
+    apiFetch<AcademicsResponse>(`/students/${user.id}/academics`)
+      .then((response) => {
+        // Normalize exam results - ensure results is always an array
+        const normalizedResponse: AcademicsResponse = {
+          ...response,
+          exams: response.exams.map((exam) => {
+            let results: ExamResult[] = [];
+            if (exam.results) {
+              if (typeof exam.results === 'string') {
+                try {
+                  results = JSON.parse(exam.results);
+                } catch {
+                  results = [];
+                }
+              } else if (Array.isArray(exam.results)) {
+                results = exam.results;
+              }
+            }
+            return {
+              ...exam,
+              results,
+            };
+          }),
+        };
+        setData(normalizedResponse);
+        if (normalizedResponse.exams.length && !selectedExam) {
+          setSelectedExam(normalizedResponse.exams[0].exam);
+        }
+        if (normalizedResponse.subjectPerformance.length && !selectedSubject) {
+          setSelectedSubject(normalizedResponse.subjectPerformance[0].subject);
+        }
+      })
+      .catch((err) => setError(err.message ?? 'Failed to load academics'))
+      .finally(() => setIsLoading(false));
+  }, [user.id]);
+
+  useEffect(() => {
+    if (data?.exams.length && !selectedExam) {
+      setSelectedExam(data.exams[0].exam);
+    }
+    if (data?.subjectPerformance.length && !selectedSubject) {
+      setSelectedSubject(data.subjectPerformance[0].subject);
+    }
+  }, [data]);
+
+  const currentExam = data?.exams.find((e) => e.exam === selectedExam);
+  const currentSubject = data?.subjectPerformance.find((s) => s.subject === selectedSubject);
 
   return (
     <div className="space-y-4">
@@ -131,18 +108,27 @@ export function StudentAcademicsSection({ user }: StudentAcademicsSectionProps) 
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Exam Selector */}
-          <Select value={selectedExam} onValueChange={setSelectedExam}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {mockExamResults.map((exam) => (
-                <SelectItem key={exam.exam} value={exam.exam}>
-                  {exam.exam}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {isLoading && <p className="text-sm text-gray-500">Loading exams...</p>}
+          {!isLoading && data?.exams.length && (
+            <Select value={selectedExam ?? undefined} onValueChange={setSelectedExam}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {data.exams.map((exam) => (
+                  <SelectItem key={exam.exam} value={exam.exam}>
+                    {exam.exam}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {error && (
+            <div className="text-sm text-red-600 bg-red-50 border border-red-200 p-3 rounded">
+              {error}
+            </div>
+          )}
 
           {currentExam && (
             <>
@@ -172,7 +158,7 @@ export function StudentAcademicsSection({ user }: StudentAcademicsSectionProps) 
               {/* Subject-wise Results */}
               <div className="space-y-2">
                 <h3 className="text-gray-900">Subject-wise Marks</h3>
-                {currentExam.results.map((result, idx) => (
+                {(Array.isArray(currentExam.results) ? currentExam.results : []).map((result, idx) => (
                   <div key={idx} className="p-3 bg-white rounded-lg border">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-gray-900">{result.subject}</span>
@@ -209,18 +195,20 @@ export function StudentAcademicsSection({ user }: StudentAcademicsSectionProps) 
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Subject Selector */}
-          <Select value={selectedSubject} onValueChange={setSelectedSubject}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {mockSubjectPerformance.map((subject) => (
-                <SelectItem key={subject.subject} value={subject.subject}>
-                  {subject.subject}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {!isLoading && data?.subjectPerformance.length && (
+            <Select value={selectedSubject ?? undefined} onValueChange={setSelectedSubject}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {data.subjectPerformance.map((subject) => (
+                  <SelectItem key={subject.subject} value={subject.subject}>
+                    {subject.subject}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
 
           {currentSubject && (
             <>

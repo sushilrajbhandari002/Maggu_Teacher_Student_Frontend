@@ -1,126 +1,28 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { User } from '../../App';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Users, BookOpen, ChevronRight } from 'lucide-react';
 import { Button } from '../ui/button';
+import { useTeacherData } from './TeacherDataContext';
 
 interface TeacherClassesSectionProps {
   user: User;
 }
 
-const mockAssignedClasses = [
-  {
-    id: 1,
-    name: 'Class 10-A',
-    subject: 'Mathematics',
-    students: 35,
-    schedule: 'Mon, Wed, Fri - 8:00 AM'
-  },
-  {
-    id: 2,
-    name: 'Class 10-B',
-    subject: 'Mathematics',
-    students: 32,
-    schedule: 'Mon, Wed, Fri - 9:00 AM'
-  },
-  {
-    id: 3,
-    name: 'Class 9-A',
-    subject: 'Mathematics',
-    students: 38,
-    schedule: 'Tue, Thu - 10:30 AM'
-  },
-  {
-    id: 4,
-    name: 'Class 9-B',
-    subject: 'Mathematics',
-    students: 37,
-    schedule: 'Tue, Thu - 11:30 AM'
-  }
-];
-
-const mockStudents = [
-  {
-    id: 1,
-    name: 'Aditya Sharma',
-    rollNo: '101',
-    class: 'Class 10-A',
-    attendance: 95,
-    lastExam: 92,
-    status: 'Excellent'
-  },
-  {
-    id: 2,
-    name: 'Priya Patel',
-    rollNo: '102',
-    class: 'Class 10-A',
-    attendance: 98,
-    lastExam: 88,
-    status: 'Good'
-  },
-  {
-    id: 3,
-    name: 'Rahul Kumar',
-    rollNo: '103',
-    class: 'Class 10-A',
-    attendance: 88,
-    lastExam: 75,
-    status: 'Average'
-  },
-  {
-    id: 4,
-    name: 'Sneha Singh',
-    rollNo: '104',
-    class: 'Class 10-A',
-    attendance: 92,
-    lastExam: 85,
-    status: 'Good'
-  },
-  {
-    id: 5,
-    name: 'Arjun Verma',
-    rollNo: '105',
-    class: 'Class 10-A',
-    attendance: 85,
-    lastExam: 70,
-    status: 'Needs Attention'
-  },
-  {
-    id: 6,
-    name: 'Ananya Gupta',
-    rollNo: '106',
-    class: 'Class 10-A',
-    attendance: 100,
-    lastExam: 95,
-    status: 'Excellent'
-  },
-  {
-    id: 7,
-    name: 'Vikram Joshi',
-    rollNo: '107',
-    class: 'Class 10-A',
-    attendance: 90,
-    lastExam: 80,
-    status: 'Good'
-  },
-  {
-    id: 8,
-    name: 'Kavya Thakur',
-    rollNo: '108',
-    class: 'Class 10-A',
-    attendance: 94,
-    lastExam: 87,
-    status: 'Good'
-  }
-];
-
 export function TeacherClassesSection({ user }: TeacherClassesSectionProps) {
   const [selectedClass, setSelectedClass] = useState<string | null>(null);
   const [view, setView] = useState<'classes' | 'students'>('classes');
+  const data = useTeacherData();
+
+  useEffect(() => {
+    if (!selectedClass && data.classes.assigned.length) {
+      setSelectedClass(data.classes.assigned[0].name);
+    }
+  }, [data.classes.assigned]);
 
   const filteredStudents = selectedClass 
-    ? mockStudents.filter(s => s.class === selectedClass)
-    : mockStudents;
+    ? data.classes.students.filter(s => s.class === selectedClass)
+    : data.classes.students;
 
   return (
     <div className="space-y-4">
@@ -154,7 +56,7 @@ export function TeacherClassesSection({ user }: TeacherClassesSectionProps) {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {mockAssignedClasses.map((cls) => (
+            {data.classes.assigned.map((cls) => (
               <div key={cls.id} className="p-4 bg-white rounded-lg border hover:border-indigo-300 transition-colors">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -214,7 +116,7 @@ export function TeacherClassesSection({ user }: TeacherClassesSectionProps) {
             {/* Class Filter */}
             {!selectedClass && (
               <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
-                {mockAssignedClasses.map((cls) => (
+                {data.classes.assigned.map((cls) => (
                   <button
                     key={cls.id}
                     onClick={() => setSelectedClass(cls.name)}

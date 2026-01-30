@@ -1,145 +1,64 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { User } from '../../App';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { FolderOpen, Download, Eye, FileText, File, X } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
+import { apiFetch } from '../../lib/api';
 
 interface StudentMaterialsSectionProps {
   user: User;
 }
 
-const mockClasses = ['Class 10', 'Class 9', 'Class 8', 'Class 7', 'Class 6'];
-const mockSubjects = ['Mathematics', 'English', 'Science', 'Social Studies', 'Hindi', 'Computer'];
+interface MaterialItem {
+  id: number;
+  title: string;
+  subject: string;
+  class: string;
+  type: string;
+  size: string;
+  uploadedByName: string;
+  uploadedOn: string;
+  url: string;
+}
 
-const mockMaterials = [
-  {
-    id: 1,
-    title: 'Quadratic Equations - Chapter Notes',
-    subject: 'Mathematics',
-    class: 'Class 10',
-    type: 'PDF',
-    size: '2.5 MB',
-    uploadedBy: 'Mr. Sharma',
-    uploadedOn: '2025-12-10',
-    url: '#'
-  },
-  {
-    id: 2,
-    title: 'Periodic Table and Chemical Bonding',
-    subject: 'Science',
-    class: 'Class 10',
-    type: 'PDF',
-    size: '3.2 MB',
-    uploadedBy: 'Dr. Kumar',
-    uploadedOn: '2025-12-09',
-    url: '#'
-  },
-  {
-    id: 3,
-    title: 'Shakespeare - Merchant of Venice Summary',
-    subject: 'English',
-    class: 'Class 10',
-    type: 'DOCX',
-    size: '1.8 MB',
-    uploadedBy: 'Ms. Patel',
-    uploadedOn: '2025-12-08',
-    url: '#'
-  },
-  {
-    id: 4,
-    title: 'Indian Independence Movement',
-    subject: 'Social Studies',
-    class: 'Class 10',
-    type: 'PDF',
-    size: '4.1 MB',
-    uploadedBy: 'Mrs. Singh',
-    uploadedOn: '2025-12-07',
-    url: '#'
-  },
-  {
-    id: 5,
-    title: 'Python Programming Basics',
-    subject: 'Computer',
-    class: 'Class 10',
-    type: 'PDF',
-    size: '2.8 MB',
-    uploadedBy: 'Mr. Gupta',
-    uploadedOn: '2025-12-06',
-    url: '#'
-  },
-  {
-    id: 6,
-    title: 'Hindi Grammar - Vyakaran Notes',
-    subject: 'Hindi',
-    class: 'Class 10',
-    type: 'PDF',
-    size: '1.5 MB',
-    uploadedBy: 'Ms. Verma',
-    uploadedOn: '2025-12-05',
-    url: '#'
-  },
-  {
-    id: 7,
-    title: 'Trigonometry - Practice Questions',
-    subject: 'Mathematics',
-    class: 'Class 10',
-    type: 'PDF',
-    size: '1.2 MB',
-    uploadedBy: 'Mr. Sharma',
-    uploadedOn: '2025-12-04',
-    url: '#'
-  },
-  {
-    id: 8,
-    title: 'Cell Biology and Genetics',
-    subject: 'Science',
-    class: 'Class 10',
-    type: 'PPTX',
-    size: '5.6 MB',
-    uploadedBy: 'Dr. Kumar',
-    uploadedOn: '2025-12-03',
-    url: '#'
-  },
-  // Class 9 materials
-  {
-    id: 9,
-    title: 'Algebra Fundamentals',
-    subject: 'Mathematics',
-    class: 'Class 9',
-    type: 'PDF',
-    size: '2.1 MB',
-    uploadedBy: 'Mr. Sharma',
-    uploadedOn: '2025-12-02',
-    url: '#'
-  },
-  {
-    id: 10,
-    title: 'Forces and Motion',
-    subject: 'Science',
-    class: 'Class 9',
-    type: 'PDF',
-    size: '3.4 MB',
-    uploadedBy: 'Dr. Kumar',
-    uploadedOn: '2025-12-01',
-    url: '#'
-  }
-];
+interface MaterialsResponse {
+  selectedClass: string;
+  classes: string[];
+  subjects: string[];
+  materials: MaterialItem[];
+}
 
 export function StudentMaterialsSection({ user }: StudentMaterialsSectionProps) {
   const [selectedClass, setSelectedClass] = useState('Class 10');
   const [selectedSubject, setSelectedSubject] = useState('All Subjects');
-  const [viewingFile, setViewingFile] = useState<typeof mockMaterials[0] | null>(null);
+  const [viewingFile, setViewingFile] = useState<MaterialItem | null>(null);
+  const [data, setData] = useState<MaterialsResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const filteredMaterials = mockMaterials.filter(material => {
-    const classMatch = material.class === selectedClass;
+  useEffect(() => {
+    setIsLoading(true);
+    setError(null);
+    apiFetch<MaterialsResponse>(`/students/${user.id}/materials`)
+      .then((response) => {
+        setData(response);
+        setSelectedClass(response.selectedClass);
+      })
+      .catch((err) => setError(err.message ?? 'Failed to load study materials'))
+      .finally(() => setIsLoading(false));
+  }, [user.id]);
+
+  const filteredMaterials = data?.materials.filter((material) => {
+    const classMatch = selectedClass === 'All Classes' || material.class === selectedClass;
     const subjectMatch = selectedSubject === 'All Subjects' || material.subject === selectedSubject;
     return classMatch && subjectMatch;
-  });
+  }) ?? [];
 
   const getFileIcon = (type: string) => {
-    switch (type) {
+    const normalized = type?.toUpperCase() ?? '';
+    switch (normalized) {
       case 'PDF':
         return <FileText className="size-8 text-red-600" />;
       case 'DOCX':
@@ -147,21 +66,23 @@ export function StudentMaterialsSection({ user }: StudentMaterialsSectionProps) 
       case 'PPTX':
         return <FileText className="size-8 text-orange-600" />;
       default:
+        if (normalized.includes('PDF')) return <FileText className="size-8 text-red-600" />;
+        if (normalized.includes('WORD')) return <FileText className="size-8 text-blue-600" />;
+        if (normalized.includes('PPT')) return <FileText className="size-8 text-orange-600" />;
         return <File className="size-8 text-gray-600" />;
     }
   };
 
-  const viewFile = (material: typeof mockMaterials[0]) => {
+  const viewFile = (material: MaterialItem) => {
     setViewingFile(material);
   };
 
-  const downloadFile = (material: typeof mockMaterials[0]) => {
-    // Mock download - in real implementation, this would trigger actual download
+  const downloadFile = (material: MaterialItem) => {
     const link = document.createElement('a');
     link.href = material.url;
-    link.download = material.title;
-    // link.click(); // Commented out for mock
-    alert(`Downloading: ${material.title}`);
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.click();
   };
 
   return (
@@ -183,7 +104,8 @@ export function StudentMaterialsSection({ user }: StudentMaterialsSectionProps) 
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {mockClasses.map((cls) => (
+                  <SelectItem value="All Classes">All Classes</SelectItem>
+                  {data?.classes.map((cls) => (
                     <SelectItem key={cls} value={cls}>
                       {cls}
                     </SelectItem>
@@ -199,7 +121,7 @@ export function StudentMaterialsSection({ user }: StudentMaterialsSectionProps) 
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="All Subjects">All Subjects</SelectItem>
-                  {mockSubjects.map((subject) => (
+                  {data?.subjects.map((subject) => (
                     <SelectItem key={subject} value={subject}>
                       {subject}
                     </SelectItem>
@@ -208,6 +130,13 @@ export function StudentMaterialsSection({ user }: StudentMaterialsSectionProps) 
               </Select>
             </div>
           </div>
+
+          {error && (
+            <div className="text-sm text-red-600 bg-red-50 border border-red-200 p-3 rounded">
+              {error}
+            </div>
+          )}
+          {isLoading && <p className="text-sm text-gray-500">Loading materials...</p>}
 
           {/* Materials List */}
           <div className="space-y-2">
@@ -237,7 +166,7 @@ export function StudentMaterialsSection({ user }: StudentMaterialsSectionProps) 
                         </span>
                       </div>
                       <div className="text-sm text-gray-500">
-                        <p>Uploaded by {material.uploadedBy} • {new Date(material.uploadedOn).toLocaleDateString()}</p>
+                        <p>Uploaded by {material.uploadedByName} • {new Date(material.uploadedOn).toLocaleDateString()}</p>
                         <p>Size: {material.size}</p>
                       </div>
                     </div>

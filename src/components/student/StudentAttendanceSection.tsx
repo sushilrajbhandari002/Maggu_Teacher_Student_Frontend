@@ -1,39 +1,60 @@
-import { useState, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { User } from '../../App';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Camera, MapPin, CheckCircle, X, Calendar as CalendarIcon } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
+import { apiFetch, apiFetchFormData } from '../../lib/api';
 
 interface StudentAttendanceSectionProps {
   user: User;
 }
 
-const mockAttendanceData = [
-  { month: 'December 2025', present: 18, absent: 2, total: 20, percentage: 90 },
-  { month: 'November 2025', present: 22, absent: 0, total: 22, percentage: 100 },
-  { month: 'October 2025', present: 20, absent: 1, total: 21, percentage: 95 },
-];
+interface AttendanceSummary {
+  month: string;
+  present: number;
+  absent: number;
+  total: number;
+  percentage: number;
+}
 
-const mockAttendanceRecords = [
-  { date: '2025-12-12', status: 'Present', time: '8:15 AM', location: 'School Campus' },
-  { date: '2025-12-11', status: 'Present', time: '8:10 AM', location: 'School Campus' },
-  { date: '2025-12-10', status: 'Present', time: '8:20 AM', location: 'School Campus' },
-  { date: '2025-12-09', status: 'Absent', time: '-', location: '-' },
-  { date: '2025-12-08', status: 'Present', time: '8:05 AM', location: 'School Campus' },
-  { date: '2025-12-07', status: 'Present', time: '8:12 AM', location: 'School Campus' },
-  { date: '2025-12-06', status: 'Present', time: '8:18 AM', location: 'School Campus' },
-  { date: '2025-12-05', status: 'Absent', time: '-', location: '-' },
-];
+interface AttendanceRecordItem {
+  date: string;
+  status: 'Present' | 'Absent';
+  time: string;
+  location: string;
+}
+
+interface AttendanceResponse {
+  summary: AttendanceSummary[];
+  records: AttendanceRecordItem[];
+}
 
 export function StudentAttendanceSection({ user }: StudentAttendanceSectionProps) {
   const [showCamera, setShowCamera] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [location, setLocation] = useState<string | null>(null);
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
+  const [attendanceData, setAttendanceData] = useState<AttendanceResponse | null>(null);
+  const [isFetchingAttendance, setIsFetchingAttendance] = useState(true);
+  const [attendanceError, setAttendanceError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+
+  useEffect(() => {
+    loadAttendance();
+  }, [user.id]);
+
+  const loadAttendance = () => {
+    setIsFetchingAttendance(true);
+    setAttendanceError(null);
+    apiFetch<AttendanceResponse>(`/students/${user.id}/attendance`)
+      .then((data) => setAttendanceData(data))
+      .catch((err) => setAttendanceError(err.message ?? 'Failed to load attendance'))
+      .finally(() => setIsFetchingAttendance(false));
+  };
 
   const getCurrentLocation = () => {
     setIsLoadingLocation(true);
@@ -108,7 +129,7 @@ export function StudentAttendanceSection({ user }: StudentAttendanceSectionProps
     startCamera();
   };
 
-  const submitAttendance = () => {
+  const submitAttendance = async () => {
     if (!capturedImage) {
       toast.error('Please capture a photo first.');
       return;
@@ -118,10 +139,23 @@ export function StudentAttendanceSection({ user }: StudentAttendanceSectionProps
       return;
     }
 
-    // Mock submission
-    toast.success('Attendance marked successfully!');
-    setCapturedImage(null);
-    setLocation(null);
+    try {
+      setIsSubmitting(true);
+      const formData = new FormData();
+      formData.append('location', location);
+      const blob = await (await fetch(capturedImage)).blob();
+      formData.append('photo', blob, 'attendance.jpg');
+
+      await apiFetchFormData(`/students/${user.id}/attendance`, formData);
+      toast.success('Attendance marked successfully!');
+      setCapturedImage(null);
+      setLocation(null);
+      loadAttendance();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to submit attendance');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -210,9 +244,9 @@ export function StudentAttendanceSection({ user }: StudentAttendanceSectionProps
             <Button
               onClick={submitAttendance}
               className="w-full bg-green-600 hover:bg-green-700"
-              disabled={!capturedImage || !location}
+              disabled={!capturedImage || !location || isSubmitting}
             >
-              Submit Attendance
+              {isSubmitting ? 'Submitting...' : 'Submit Attendance'}
             </Button>
           )}
         </CardContent>
@@ -227,68 +261,78 @@ export function StudentAttendanceSection({ user }: StudentAttendanceSectionProps
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Monthly Summary */}
-          {mockAttendanceData.map((month, idx) => (
-            <div key={idx} className="p-4 bg-gray-50 rounded-lg border">
-              <h3 className="text-gray-900 mb-3">{month.month}</h3>
-              <div className="grid grid-cols-3 gap-3 mb-3">
-                <div className="text-center">
-                  <p className="text-2xl text-green-600">{month.present}</p>
-                  <p className="text-xs text-gray-600">Present</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl text-red-600">{month.absent}</p>
-                  <p className="text-xs text-gray-600">Absent</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl text-blue-600">{month.total}</p>
-                  <p className="text-xs text-gray-600">Total</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="flex-1 bg-gray-200 rounded-full h-2">
-                  <div
-                    className="bg-green-600 h-2 rounded-full"
-                    style={{ width: `${month.percentage}%` }}
-                  />
-                </div>
-                <span className="text-sm text-gray-700">{month.percentage}%</span>
-              </div>
+          {attendanceError && (
+            <div className="text-sm text-red-600 bg-red-50 border border-red-200 p-3 rounded">
+              {attendanceError}
             </div>
-          ))}
-
-          {/* Daily Records */}
-          <div className="space-y-2">
-            <h3 className="text-gray-900">Recent Records</h3>
-            {mockAttendanceRecords.map((record, idx) => (
-              <div
-                key={idx}
-                className={`p-3 rounded-lg border ${
-                  record.status === 'Present'
-                    ? 'bg-green-50 border-green-200'
-                    : 'bg-red-50 border-red-200'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-gray-900">{new Date(record.date).toLocaleDateString()}</p>
-                    <p className="text-sm text-gray-600">
-                      {record.time} {record.location !== '-' && `• ${record.location}`}
-                    </p>
+          )}
+          {isFetchingAttendance && (
+            <p className="text-sm text-gray-500">Loading attendance summary...</p>
+          )}
+          {!isFetchingAttendance && attendanceData && (
+            <>
+              {attendanceData.summary.map((month, idx) => (
+                <div key={idx} className="p-4 bg-gray-50 rounded-lg border">
+                  <h3 className="text-gray-900 mb-3">{month.month}</h3>
+                  <div className="grid grid-cols-3 gap-3 mb-3">
+                    <div className="text-center">
+                      <p className="text-2xl text-green-600">{month.present}</p>
+                      <p className="text-xs text-gray-600">Present</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl text-red-600">{month.absent}</p>
+                      <p className="text-xs text-gray-600">Absent</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl text-blue-600">{month.total}</p>
+                      <p className="text-xs text-gray-600">Total</p>
+                    </div>
                   </div>
-                  <span
-                    className={`text-sm px-3 py-1 rounded-full ${
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 bg-gray-200 rounded-full h-2">
+                      <div
+                        className="bg-green-600 h-2 rounded-full"
+                        style={{ width: `${month.percentage}%` }}
+                      />
+                    </div>
+                    <span className="text-sm text-gray-700">{month.percentage}%</span>
+                  </div>
+                </div>
+              ))}
+
+              <div className="space-y-2">
+                <h3 className="text-gray-900">Recent Records</h3>
+                {attendanceData.records.map((record, idx) => (
+                  <div
+                    key={`${record.date}-${idx}`}
+                    className={`p-3 rounded-lg border ${
                       record.status === 'Present'
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-red-100 text-red-700'
+                        ? 'bg-green-50 border-green-200'
+                        : 'bg-red-50 border-red-200'
                     }`}
                   >
-                    {record.status}
-                  </span>
-                </div>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-gray-900">{new Date(record.date).toLocaleDateString()}</p>
+                        <p className="text-sm text-gray-600">
+                          {record.time} {record.location !== '-' && `• ${record.location}`}
+                        </p>
+                      </div>
+                      <span
+                        className={`text-sm px-3 py-1 rounded-full ${
+                          record.status === 'Present'
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-red-100 text-red-700'
+                        }`}
+                      >
+                        {record.status}
+                      </span>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </>
+          )}
         </CardContent>
       </Card>
     </div>

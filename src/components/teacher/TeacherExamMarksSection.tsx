@@ -7,62 +7,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Input } from '../ui/input';
 import { toast } from 'sonner@2.0.3';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
+import { useTeacherData } from './TeacherDataContext';
+import type { TeacherDashboardData } from './TeacherDataContext';
 
 interface TeacherExamMarksSectionProps {
   user: User;
 }
-
-const mockClasses = ['Class 10-A', 'Class 10-B', 'Class 9-A', 'Class 9-B'];
-const mockExams = ['Half Yearly 2025', 'First Term 2025', 'Unit Test 2', 'Unit Test 1'];
-const mockSubjects = ['Mathematics', 'English', 'Science', 'Social Studies', 'Hindi', 'Computer'];
-
-const mockStudentsForMarks = [
-  { id: 1, name: 'Aditya Sharma', rollNo: '101' },
-  { id: 2, name: 'Priya Patel', rollNo: '102' },
-  { id: 3, name: 'Rahul Kumar', rollNo: '103' },
-  { id: 4, name: 'Sneha Singh', rollNo: '104' },
-  { id: 5, name: 'Arjun Verma', rollNo: '105' },
-  { id: 6, name: 'Ananya Gupta', rollNo: '106' },
-  { id: 7, name: 'Vikram Joshi', rollNo: '107' },
-  { id: 8, name: 'Kavya Thakur', rollNo: '108' }
-];
-
-const mockExistingMarks = [
-  {
-    exam: 'Half Yearly 2025',
-    class: 'Class 10-A',
-    subject: 'Mathematics',
-    year: '2025',
-    totalMarks: 100,
-    students: [
-      { rollNo: '101', name: 'Aditya Sharma', marks: 92 },
-      { rollNo: '102', name: 'Priya Patel', marks: 88 },
-      { rollNo: '103', name: 'Rahul Kumar', marks: 75 },
-      { rollNo: '104', name: 'Sneha Singh', marks: 85 },
-      { rollNo: '105', name: 'Arjun Verma', marks: 70 },
-      { rollNo: '106', name: 'Ananya Gupta', marks: 95 },
-      { rollNo: '107', name: 'Vikram Joshi', marks: 80 },
-      { rollNo: '108', name: 'Kavya Thakur', marks: 87 }
-    ]
-  },
-  {
-    exam: 'First Term 2025',
-    class: 'Class 10-A',
-    subject: 'Mathematics',
-    year: '2025',
-    totalMarks: 100,
-    students: [
-      { rollNo: '101', name: 'Aditya Sharma', marks: 88 },
-      { rollNo: '102', name: 'Priya Patel', marks: 85 },
-      { rollNo: '103', name: 'Rahul Kumar', marks: 72 },
-      { rollNo: '104', name: 'Sneha Singh', marks: 82 },
-      { rollNo: '105', name: 'Arjun Verma', marks: 68 },
-      { rollNo: '106', name: 'Ananya Gupta', marks: 92 },
-      { rollNo: '107', name: 'Vikram Joshi', marks: 78 },
-      { rollNo: '108', name: 'Kavya Thakur', marks: 84 }
-    ]
-  }
-];
 
 export function TeacherExamMarksSection({ user }: TeacherExamMarksSectionProps) {
   const [view, setView] = useState<'enter' | 'import' | 'existing'>('enter');
@@ -71,10 +21,15 @@ export function TeacherExamMarksSection({ user }: TeacherExamMarksSectionProps) 
   const [selectedSubject, setSelectedSubject] = useState('');
   const [totalMarks, setTotalMarks] = useState('');
   const [marks, setMarks] = useState<Record<number, string>>({});
-  const [viewingMarks, setViewingMarks] = useState<typeof mockExistingMarks[0] | null>(null);
+  const [viewingMarks, setViewingMarks] = useState<
+    TeacherDashboardData['exams']['existingMarks'][0] | null
+  >(null);
   const [filterExam, setFilterExam] = useState('All Exams');
   const [filterClass, setFilterClass] = useState('All Classes');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const data = useTeacherData();
+  const studentsForMarks = data.exams.students;
+  const existingMarks = data.exams.existingMarks;
 
   const handleMarkChange = (studentId: number, value: string) => {
     setMarks(prev => ({
@@ -89,7 +44,7 @@ export function TeacherExamMarksSection({ user }: TeacherExamMarksSectionProps) 
       return;
     }
 
-    const allMarksEntered = mockStudentsForMarks.every(student => marks[student.id]);
+    const allMarksEntered = studentsForMarks.every(student => marks[student.id]);
     if (!allMarksEntered) {
       toast.error('Please enter marks for all students');
       return;
@@ -126,7 +81,7 @@ export function TeacherExamMarksSection({ user }: TeacherExamMarksSectionProps) 
     // In real implementation, this would trigger actual download
   };
 
-  const filteredMarks = mockExistingMarks.filter(mark => {
+  const filteredMarks = existingMarks.filter((mark) => {
     const examMatch = filterExam === 'All Exams' || mark.exam === filterExam;
     const classMatch = filterClass === 'All Classes' || mark.class === filterClass;
     return examMatch && classMatch;
@@ -185,13 +140,13 @@ export function TeacherExamMarksSection({ user }: TeacherExamMarksSectionProps) 
                   <SelectTrigger>
                     <SelectValue placeholder="Select class" />
                   </SelectTrigger>
-                  <SelectContent>
-                    {mockClasses.map((cls) => (
-                      <SelectItem key={cls} value={cls}>
-                        {cls}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
+                <SelectContent>
+                  {data.exams.classes.map((cls) => (
+                    <SelectItem key={cls} value={cls}>
+                      {cls}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
                 </Select>
               </div>
 
@@ -203,13 +158,13 @@ export function TeacherExamMarksSection({ user }: TeacherExamMarksSectionProps) 
                   <SelectTrigger>
                     <SelectValue placeholder="Select exam" />
                   </SelectTrigger>
-                  <SelectContent>
-                    {mockExams.map((exam) => (
-                      <SelectItem key={exam} value={exam}>
-                        {exam}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
+                <SelectContent>
+                  {data.exams.exams.map((exam) => (
+                    <SelectItem key={exam} value={exam}>
+                      {exam}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
                 </Select>
               </div>
 
@@ -221,13 +176,13 @@ export function TeacherExamMarksSection({ user }: TeacherExamMarksSectionProps) 
                   <SelectTrigger>
                     <SelectValue placeholder="Select subject" />
                   </SelectTrigger>
-                  <SelectContent>
-                    {mockSubjects.map((subject) => (
-                      <SelectItem key={subject} value={subject}>
-                        {subject}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
+                <SelectContent>
+                  {data.exams.subjects.map((subject) => (
+                    <SelectItem key={subject} value={subject}>
+                      {subject}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
                 </Select>
               </div>
 
@@ -250,7 +205,7 @@ export function TeacherExamMarksSection({ user }: TeacherExamMarksSectionProps) 
                 <div className="border-t pt-4">
                   <h3 className="text-gray-900 mb-3">Enter Marks for Students</h3>
                   <div className="space-y-2">
-                    {mockStudentsForMarks.map((student) => (
+                    {studentsForMarks.map((student) => (
                       <div key={student.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                         <div className="flex-1">
                           <p className="text-gray-900">{student.name}</p>
@@ -352,14 +307,14 @@ export function TeacherExamMarksSection({ user }: TeacherExamMarksSectionProps) 
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="All Exams">All Exams</SelectItem>
-                    {mockExams.map((exam) => (
-                      <SelectItem key={exam} value={exam}>
-                        {exam}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
+                <SelectContent>
+                  <SelectItem value="All Exams">All Exams</SelectItem>
+                  {data.exams.exams.map((exam) => (
+                    <SelectItem key={exam} value={exam}>
+                      {exam}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
                 </Select>
               </div>
 
@@ -369,14 +324,14 @@ export function TeacherExamMarksSection({ user }: TeacherExamMarksSectionProps) 
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="All Classes">All Classes</SelectItem>
-                    {mockClasses.map((cls) => (
-                      <SelectItem key={cls} value={cls}>
-                        {cls}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
+                <SelectContent>
+                  <SelectItem value="All Classes">All Classes</SelectItem>
+                  {data.exams.classes.map((cls) => (
+                    <SelectItem key={cls} value={cls}>
+                      {cls}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
                 </Select>
               </div>
             </div>

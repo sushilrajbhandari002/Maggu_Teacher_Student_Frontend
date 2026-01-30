@@ -1,28 +1,100 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '../ui/dialog';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Search, UserPlus, Edit2, Trash2, Mail, Phone } from 'lucide-react';
+import { apiFetch } from '../../lib/api';
+import { toast } from 'sonner@2.0.3';
 
-const mockTeachers = [
-  { id: 't1', name: 'John Doe', email: 'john.doe@sushilschool.edu', phone: '+1234567890', classTeacher: 'Class 10A', status: 'Active' },
-  { id: 't2', name: 'Sarah Smith', email: 'sarah.smith@sushilschool.edu', phone: '+1234567891', classTeacher: '-', status: 'Active' },
-  { id: 't3', name: 'Michael Brown', email: 'michael.brown@sushilschool.edu', phone: '+1234567892', classTeacher: 'Class 9A', status: 'Active' },
-];
-
-const mockStudents = [
-  { id: 's1', name: 'Alice Johnson', email: 'alice.johnson@student.sushilschool.edu', phone: '+1234567893', class: 'Class 10A', rollNo: '101', status: 'Active' },
-  { id: 's2', name: 'Bob Wilson', email: 'bob.wilson@student.sushilschool.edu', phone: '+1234567894', class: 'Class 10A', rollNo: '102', status: 'Active' },
-  { id: 's3', name: 'Charlie Davis', email: 'charlie.davis@student.sushilschool.edu', phone: '+1234567895', class: 'Class 9A', rollNo: '201', status: 'Active' },
-];
+interface AdminDashboardData {
+  teachers: Array<{
+    id: number;
+    name: string;
+    email: string;
+    phone?: string | null;
+    classes: string[];
+    subject: string;
+  }>;
+  students: Array<{
+    id: number;
+    name: string;
+    email: string;
+    phone?: string | null;
+    class?: string | null;
+    rollNo?: string | null;
+  }>;
+}
 
 export function AdminUsersView() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [data, setData] = useState<AdminDashboardData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [formData, setFormData] = useState({
+    userType: '',
+    name: '',
+    email: '',
+    password: '',
+    phone: '',
+    address: '',
+    class: '',
+    rollNumber: '',
+    teacherId: '',
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const loadData = () => {
+    setIsLoading(true);
+    apiFetch<AdminDashboardData>('/admin/dashboard')
+      .then(setData)
+      .catch(() => setData({ teachers: [], students: [] }))
+      .finally(() => setIsLoading(false));
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  if (isLoading) {
+    return <div className="p-4 text-gray-600">Loading users...</div>;
+  }
+
+  if (!data) {
+    return <div className="p-4 text-red-600">Failed to load users</div>;
+  }
+
+  const teachers = data.teachers.map((teacher) => ({
+    id: teacher.id.toString(),
+    name: teacher.name,
+    email: teacher.email,
+    phone: teacher.phone ?? 'N/A',
+    classTeacher: teacher.classes[0] ?? '-',
+    status: 'Active',
+  }));
+
+  const students = data.students.map((student) => ({
+    id: student.id.toString(),
+    name: student.name,
+    email: student.email,
+    phone: student.phone ?? 'N/A',
+    class: student.class ?? 'Unknown',
+    rollNo: student.rollNo ?? 'N/A',
+    status: 'Active',
+  }));
+
+  const filteredTeachers = teachers.filter((t) =>
+    t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    t.email.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const filteredStudents = students.filter((s) =>
+    s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    s.email.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <div className="space-y-6">
@@ -36,21 +108,102 @@ export function AdminUsersView() {
             className="pl-10"
           />
         </div>
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-purple-600 hover:bg-purple-700">
-              <UserPlus className="size-4 mr-2" />
-              Add User
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Add New User</DialogTitle>
-            </DialogHeader>
-            <form className="space-y-4 mt-4">
+        <Button 
+          className="bg-purple-600 hover:bg-purple-700"
+          onClick={() => {
+            setIsAddDialogOpen(true);
+            setFormData(prev => ({ ...prev, userType: '' }));
+          }}
+        >
+          <UserPlus className="size-4 mr-2" />
+          Add User
+        </Button>
+      </div>
+
+      <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
+        setIsAddDialogOpen(open);
+        if (!open) {
+          // Reset form when dialog closes
+          setFormData({
+            userType: '',
+            name: '',
+            email: '',
+            password: '',
+            phone: '',
+            address: '',
+            class: '',
+            rollNumber: '',
+            teacherId: '',
+          });
+        }
+      }}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add New User</DialogTitle>
+            <DialogDescription>
+              Fill in the details below to add a new user to the system. Select the user type and provide the required information.
+            </DialogDescription>
+          </DialogHeader>
+            <form 
+              className="space-y-4 mt-4"
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!formData.userType || !formData.name || !formData.email || !formData.password) {
+                  alert('Please fill in all required fields');
+                  return;
+                }
+
+                setIsSubmitting(true);
+                try {
+                  const payload: any = {
+                    name: formData.name,
+                    email: formData.email,
+                    password: formData.password,
+                    role: formData.userType as 'teacher' | 'student',
+                    phone: formData.phone || undefined,
+                    address: formData.address || undefined,
+                  };
+
+                  if (formData.userType === 'student') {
+                    payload.class = formData.class || undefined;
+                    payload.rollNumber = formData.rollNumber || undefined;
+                  } else if (formData.userType === 'teacher') {
+                    payload.teacherId = formData.teacherId || undefined;
+                  }
+
+                  await apiFetch('/admin/users', {
+                    method: 'POST',
+                    body: JSON.stringify(payload),
+                  });
+
+                  // Reset form and reload data
+                  setFormData({
+                    userType: '',
+                    name: '',
+                    email: '',
+                    password: '',
+                    phone: '',
+                    address: '',
+                    class: '',
+                    rollNumber: '',
+                    teacherId: '',
+                  });
+                  setIsAddDialogOpen(false);
+                  loadData();
+                  toast.success('User created successfully!');
+                } catch (error) {
+                  toast.error(error instanceof Error ? error.message : 'Failed to create user');
+                } finally {
+                  setIsSubmitting(false);
+                }
+              }}
+            >
               <div>
-                <Label htmlFor="userType">User Type</Label>
-                <Select>
+                <Label htmlFor="userType">User Type *</Label>
+                <Select 
+                  value={formData.userType} 
+                  onValueChange={(value) => setFormData({ ...formData, userType: value })}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select user type" />
                   </SelectTrigger>
@@ -61,43 +214,146 @@ export function AdminUsersView() {
                 </Select>
               </div>
               <div>
-                <Label htmlFor="name">Full Name</Label>
-                <Input id="name" placeholder="Enter full name" />
+                <Label htmlFor="name">Full Name *</Label>
+                <Input 
+                  id="name" 
+                  placeholder="Enter full name" 
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  required
+                />
               </div>
               <div>
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" placeholder="Enter email" />
+                <Label htmlFor="email">Email *</Label>
+                <Input 
+                  id="email" 
+                  type="email" 
+                  placeholder="Enter email" 
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="password">Password *</Label>
+                <Input 
+                  id="password" 
+                  type="password" 
+                  placeholder="Enter password (min 6 characters)" 
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  required
+                  minLength={6}
+                />
               </div>
               <div>
                 <Label htmlFor="phone">Phone</Label>
-                <Input id="phone" type="tel" placeholder="Enter phone number" />
+                <Input 
+                  id="phone" 
+                  type="tel" 
+                  placeholder="Enter phone number" 
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                />
               </div>
               <div>
                 <Label htmlFor="address">Address</Label>
-                <Input id="address" placeholder="Enter address" />
+                <Input 
+                  id="address" 
+                  placeholder="Enter address" 
+                  value={formData.address}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                />
               </div>
+              {formData.userType === 'student' && (
+                <>
+                  <div>
+                    <Label htmlFor="class">Class</Label>
+                    <Input 
+                      id="class" 
+                      placeholder="e.g., Class 10A" 
+                      value={formData.class}
+                      onChange={(e) => setFormData({ ...formData, class: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="rollNumber">Roll Number</Label>
+                    <Input 
+                      id="rollNumber" 
+                      placeholder="Enter roll number" 
+                      value={formData.rollNumber}
+                      onChange={(e) => setFormData({ ...formData, rollNumber: e.target.value })}
+                    />
+                  </div>
+                </>
+              )}
+              {formData.userType === 'teacher' && (
+                <div>
+                  <Label htmlFor="teacherId">Teacher ID</Label>
+                  <Input 
+                    id="teacherId" 
+                    placeholder="Enter teacher ID" 
+                    value={formData.teacherId}
+                    onChange={(e) => setFormData({ ...formData, teacherId: e.target.value })}
+                  />
+                </div>
+              )}
               <div className="flex gap-3">
-                <Button type="button" variant="outline" className="flex-1" onClick={() => setIsAddDialogOpen(false)}>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  className="flex-1" 
+                  onClick={() => {
+                    setIsAddDialogOpen(false);
+                    setFormData({
+                      userType: '',
+                      name: '',
+                      email: '',
+                      password: '',
+                      phone: '',
+                      address: '',
+                      class: '',
+                      rollNumber: '',
+                      teacherId: '',
+                    });
+                  }}
+                  disabled={isSubmitting}
+                >
                   Cancel
                 </Button>
-                <Button type="submit" className="flex-1 bg-purple-600 hover:bg-purple-700">
-                  Add User
+                <Button 
+                  type="submit" 
+                  className="flex-1 bg-purple-600 hover:bg-purple-700"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? 'Adding...' : 'Add User'}
                 </Button>
               </div>
             </form>
           </DialogContent>
         </Dialog>
-      </div>
 
       <Tabs defaultValue="teachers" className="w-full">
         <TabsList className="grid w-full max-w-md grid-cols-2">
-          <TabsTrigger value="teachers">Teachers ({mockTeachers.length})</TabsTrigger>
-          <TabsTrigger value="students">Students ({mockStudents.length})</TabsTrigger>
+          <TabsTrigger value="teachers">Teachers ({teachers.length})</TabsTrigger>
+          <TabsTrigger value="students">Students ({students.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="teachers" className="mt-6">
+          <div className="mb-4 flex justify-end">
+            <Button 
+              className="bg-green-600 hover:bg-green-700"
+              onClick={() => {
+                setIsAddDialogOpen(true);
+                setFormData(prev => ({ ...prev, userType: 'teacher' }));
+              }}
+            >
+              <UserPlus className="size-4 mr-2" />
+              Add Teacher
+            </Button>
+          </div>
           <div className="grid grid-cols-1 gap-4">
-            {mockTeachers.map((teacher) => (
+            {filteredTeachers.map((teacher) => (
               <Card key={teacher.id} className="p-4 sm:p-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex items-start gap-4">
@@ -131,7 +387,21 @@ export function AdminUsersView() {
                       <Edit2 className="size-3 mr-1" />
                       Edit
                     </Button>
-                    <Button variant="outline" size="sm" className="flex-1 sm:flex-none text-red-600 border-red-200 hover:bg-red-50">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-1 sm:flex-none text-red-600 border-red-200 hover:bg-red-50"
+                      onClick={async () => {
+                        if (!confirm(`Are you sure you want to delete ${teacher.name}?`)) return;
+                        try {
+                          await apiFetch(`/admin/users/${teacher.id}`, { method: 'DELETE' });
+                          toast.success('Teacher deleted successfully');
+                          loadData();
+                        } catch (error) {
+                          toast.error(error instanceof Error ? error.message : 'Failed to delete teacher');
+                        }
+                      }}
+                    >
                       <Trash2 className="size-3 mr-1" />
                       Delete
                     </Button>
@@ -143,8 +413,20 @@ export function AdminUsersView() {
         </TabsContent>
 
         <TabsContent value="students" className="mt-6">
+          <div className="mb-4 flex justify-end">
+            <Button 
+              className="bg-blue-600 hover:bg-blue-700"
+              onClick={() => {
+                setIsAddDialogOpen(true);
+                setFormData(prev => ({ ...prev, userType: 'student' }));
+              }}
+            >
+              <UserPlus className="size-4 mr-2" />
+              Add Student
+            </Button>
+          </div>
           <div className="grid grid-cols-1 gap-4">
-            {mockStudents.map((student) => (
+            {filteredStudents.map((student) => (
               <Card key={student.id} className="p-4 sm:p-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex items-start gap-4">
@@ -178,7 +460,21 @@ export function AdminUsersView() {
                       <Edit2 className="size-3 mr-1" />
                       Edit
                     </Button>
-                    <Button variant="outline" size="sm" className="flex-1 sm:flex-none text-red-600 border-red-200 hover:bg-red-50">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-1 sm:flex-none text-red-600 border-red-200 hover:bg-red-50"
+                      onClick={async () => {
+                        if (!confirm(`Are you sure you want to delete ${student.name}?`)) return;
+                        try {
+                          await apiFetch(`/admin/users/${student.id}`, { method: 'DELETE' });
+                          toast.success('Student deleted successfully');
+                          loadData();
+                        } catch (error) {
+                          toast.error(error instanceof Error ? error.message : 'Failed to delete student');
+                        }
+                      }}
+                    >
                       <Trash2 className="size-3 mr-1" />
                       Delete
                     </Button>

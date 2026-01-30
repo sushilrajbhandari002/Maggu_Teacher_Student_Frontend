@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -7,39 +7,41 @@ import { Textarea } from '../ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Bell, Plus, Calendar, Users, Edit2, Trash2 } from 'lucide-react';
+import { apiFetch } from '../../lib/api';
 
-const mockNotices = [
-  { 
-    id: 'n1', 
-    title: 'Annual Sports Day', 
-    description: 'Annual sports day will be held on December 15th. All students must participate.',
-    date: '2025-12-02',
-    priority: 'High',
-    target: 'All Students',
-    status: 'Active'
-  },
-  { 
-    id: 'n2', 
-    title: 'Parent-Teacher Meeting', 
-    description: 'Parent-teacher meeting scheduled for December 10th at 10 AM.',
-    date: '2025-12-01',
-    priority: 'Medium',
-    target: 'Parents',
-    status: 'Active'
-  },
-  { 
-    id: 'n3', 
-    title: 'Holiday Notice', 
-    description: 'School will remain closed on December 25th for Christmas.',
-    date: '2025-11-30',
-    priority: 'Low',
-    target: 'All',
-    status: 'Active'
-  },
-];
+interface Notice {
+  id: number;
+  title: string;
+  content: string;
+  date: string;
+  type: string;
+}
 
 export function AdminNoticesView() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [notices, setNotices] = useState<Notice[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    apiFetch<{ notices: Notice[] }>('/admin/dashboard')
+      .then((data) => setNotices(data.notices))
+      .catch(() => setNotices([]))
+      .finally(() => setIsLoading(false));
+  }, []);
+
+  if (isLoading) {
+    return <div className="p-4 text-gray-600">Loading notices...</div>;
+  }
+
+  const noticesList = notices.map((notice) => ({
+    id: notice.id.toString(),
+    title: notice.title,
+    description: notice.content,
+    date: notice.date,
+    priority: notice.type === 'Event' ? 'High' : notice.type === 'General' ? 'Medium' : 'Low',
+    target: 'All',
+    status: 'Active',
+  }));
 
   return (
     <div className="space-y-6">
@@ -109,7 +111,7 @@ export function AdminNoticesView() {
       </div>
 
       <div className="space-y-4">
-        {mockNotices.map((notice) => (
+        {noticesList.map((notice) => (
           <Card key={notice.id} className="p-4 sm:p-6">
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
               <div className="flex items-start gap-4 flex-1 min-w-0">

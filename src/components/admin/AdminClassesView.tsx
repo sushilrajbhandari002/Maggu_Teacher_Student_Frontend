@@ -1,20 +1,62 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
 import { Plus, Users, User, Edit2, Trash2 } from 'lucide-react';
+import { apiFetch } from '../../lib/api';
 
-const mockClasses = [
-  { id: 'c1', name: 'Class 10A', students: 35, classTeacher: 'John Doe', subjects: ['Math', 'Science', 'English', 'History'] },
-  { id: 'c2', name: 'Class 10B', students: 32, classTeacher: 'Sarah Smith', subjects: ['Math', 'Science', 'English', 'Geography'] },
-  { id: 'c3', name: 'Class 9A', students: 38, classTeacher: 'Michael Brown', subjects: ['Math', 'Science', 'English', 'Social Studies'] },
-  { id: 'c4', name: 'Class 9B', students: 30, classTeacher: '-', subjects: ['Math', 'Science', 'English', 'Social Studies'] },
-];
+interface ClassAssignment {
+  id: number;
+  name: string;
+  subject: string;
+  students: number;
+  schedule: string;
+}
 
 export function AdminClassesView() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [classes, setClasses] = useState<ClassAssignment[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    apiFetch<{ classes: ClassAssignment[]; students: Array<{ class?: string | null }>; teachers: Array<{ name: string; classes: string[] }> }>('/admin/dashboard')
+      .then((data) => {
+        setClasses(data.classes);
+        // Group students by class to get student counts
+        const classCounts = new Map<string, number>();
+        data.students.forEach((student) => {
+          const className = student.class ?? 'Unknown';
+          classCounts.set(className, (classCounts.get(className) ?? 0) + 1);
+        });
+        // Map classes with student counts and teachers
+        const classesWithDetails = data.classes.map((cls) => {
+          const teacher = data.teachers.find((t) => t.classes.includes(cls.name));
+          return {
+            ...cls,
+            students: classCounts.get(cls.name) ?? 0,
+            classTeacher: teacher?.name ?? '-',
+            subjects: [cls.subject],
+          };
+        });
+        setClasses(classesWithDetails as any);
+      })
+      .catch(() => setClasses([]))
+      .finally(() => setIsLoading(false));
+  }, []);
+
+  if (isLoading) {
+    return <div className="p-4 text-gray-600">Loading classes...</div>;
+  }
+
+  const classesList = classes.map((classItem: any) => ({
+    id: classItem.id.toString(),
+    name: classItem.name,
+    students: classItem.students ?? 0,
+    classTeacher: classItem.classTeacher ?? '-',
+    subjects: classItem.subjects ?? [classItem.subject],
+  }));
 
   return (
     <div className="space-y-6">
@@ -61,7 +103,7 @@ export function AdminClassesView() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {mockClasses.map((classItem) => (
+        {classesList.map((classItem) => (
           <Card key={classItem.id} className="p-6">
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">

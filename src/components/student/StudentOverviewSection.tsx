@@ -1,106 +1,68 @@
+import { useEffect, useState } from 'react';
 import { User } from '../../App';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Bell, Calendar as CalendarIcon, Clock } from 'lucide-react';
 import { Calendar } from '../ui/calendar';
-import { useState } from 'react';
+import { apiFetch } from '../../lib/api';
 
 interface StudentOverviewSectionProps {
   user: User;
 }
 
-const mockNotices = [
-  {
-    id: 1,
-    title: 'Annual Sports Day',
-    content: 'Annual Sports Day will be held on December 20th, 2025. All students must participate.',
-    date: '2025-12-10',
-    type: 'Event'
-  },
-  {
-    id: 2,
-    title: 'Winter Break Announcement',
-    content: 'School will remain closed from December 25th to January 5th for winter break.',
-    date: '2025-12-08',
-    type: 'Notice'
-  },
-  {
-    id: 3,
-    title: 'Parent-Teacher Meeting',
-    content: 'Parent-Teacher meeting scheduled for December 18th. Parents are requested to attend.',
-    date: '2025-12-07',
-    type: 'Meeting'
-  }
-];
-
-const mockEvents = [
-  {
-    id: 1,
-    title: 'Science Exhibition',
-    date: '2025-12-15',
-    time: '10:00 AM',
-    venue: 'School Auditorium'
-  },
-  {
-    id: 2,
-    title: 'Annual Sports Day',
-    date: '2025-12-20',
-    time: '8:00 AM',
-    venue: 'School Ground'
-  },
-  {
-    id: 3,
-    title: 'Cultural Program',
-    date: '2025-12-22',
-    time: '2:00 PM',
-    venue: 'School Auditorium'
-  }
-];
-
-const mockRoutine = [
-  { day: 'Monday', periods: [
-    { time: '8:00-9:00', subject: 'Mathematics', teacher: 'Mr. Sharma' },
-    { time: '9:00-10:00', subject: 'English', teacher: 'Ms. Patel' },
-    { time: '10:00-10:30', subject: 'Break', teacher: '-' },
-    { time: '10:30-11:30', subject: 'Science', teacher: 'Dr. Kumar' },
-    { time: '11:30-12:30', subject: 'Social Studies', teacher: 'Mrs. Singh' }
-  ]},
-  { day: 'Tuesday', periods: [
-    { time: '8:00-9:00', subject: 'Science', teacher: 'Dr. Kumar' },
-    { time: '9:00-10:00', subject: 'Mathematics', teacher: 'Mr. Sharma' },
-    { time: '10:00-10:30', subject: 'Break', teacher: '-' },
-    { time: '10:30-11:30', subject: 'Hindi', teacher: 'Ms. Verma' },
-    { time: '11:30-12:30', subject: 'Computer', teacher: 'Mr. Gupta' }
-  ]},
-  { day: 'Wednesday', periods: [
-    { time: '8:00-9:00', subject: 'English', teacher: 'Ms. Patel' },
-    { time: '9:00-10:00', subject: 'Physical Education', teacher: 'Mr. Yadav' },
-    { time: '10:00-10:30', subject: 'Break', teacher: '-' },
-    { time: '10:30-11:30', subject: 'Mathematics', teacher: 'Mr. Sharma' },
-    { time: '11:30-12:30', subject: 'Art', teacher: 'Mrs. Joshi' }
-  ]},
-  { day: 'Thursday', periods: [
-    { time: '8:00-9:00', subject: 'Social Studies', teacher: 'Mrs. Singh' },
-    { time: '9:00-10:00', subject: 'Science', teacher: 'Dr. Kumar' },
-    { time: '10:00-10:30', subject: 'Break', teacher: '-' },
-    { time: '10:30-11:30', subject: 'English', teacher: 'Ms. Patel' },
-    { time: '11:30-12:30', subject: 'Mathematics', teacher: 'Mr. Sharma' }
-  ]},
-  { day: 'Friday', periods: [
-    { time: '8:00-9:00', subject: 'Hindi', teacher: 'Ms. Verma' },
-    { time: '9:00-10:00', subject: 'Computer', teacher: 'Mr. Gupta' },
-    { time: '10:00-10:30', subject: 'Break', teacher: '-' },
-    { time: '10:30-11:30', subject: 'Science', teacher: 'Dr. Kumar' },
-    { time: '11:30-12:30', subject: 'Music', teacher: 'Mr. Thakur' }
-  ]}
-];
+interface OverviewResponse {
+  notices: Array<{
+    id: number;
+    title: string;
+    content: string;
+    date: string;
+    type: string;
+  }>;
+  events: Array<{
+    id: number;
+    title: string;
+    date: string;
+    time: string;
+    venue: string;
+  }>;
+  routine: Array<{
+    day: string;
+    periods: { time: string; subject: string; teacher: string }[];
+  }>;
+}
 
 export function StudentOverviewSection({ user }: StudentOverviewSectionProps) {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedDay, setSelectedDay] = useState('Monday');
+  const [data, setData] = useState<OverviewResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setIsLoading(true);
+    setError(null);
+
+    apiFetch<OverviewResponse>(`/students/${user.id}/overview`, {
+      signal: controller.signal,
+    })
+      .then((response) => {
+        setData(response);
+        if (response.routine.length) {
+          setSelectedDay(response.routine[0].day);
+        }
+      })
+      .catch((err) => {
+        if (err.name !== 'AbortError') {
+          setError(err.message ?? 'Failed to load overview');
+        }
+      })
+      .finally(() => setIsLoading(false));
+
+    return () => controller.abort();
+  }, [user.id]);
 
   return (
     <div className="space-y-4">
-      {/* Notices */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -109,7 +71,16 @@ export function StudentOverviewSection({ user }: StudentOverviewSectionProps) {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {mockNotices.map((notice) => (
+          {error && (
+            <div className="text-sm text-red-600 bg-red-50 border border-red-200 p-3 rounded">
+              {error}
+            </div>
+          )}
+          {isLoading && !data && <p className="text-sm text-gray-500">Loading notices...</p>}
+          {!isLoading && data?.notices?.length === 0 && (
+            <p className="text-sm text-gray-500">No notices available</p>
+          )}
+          {data?.notices?.map((notice) => (
             <div key={notice.id} className="p-3 bg-gray-50 rounded-lg border">
               <div className="flex items-start justify-between mb-1">
                 <h3 className="text-gray-900">{notice.title}</h3>
@@ -118,13 +89,14 @@ export function StudentOverviewSection({ user }: StudentOverviewSectionProps) {
                 </span>
               </div>
               <p className="text-sm text-gray-600 mb-2">{notice.content}</p>
-              <p className="text-xs text-gray-500">{new Date(notice.date).toLocaleDateString()}</p>
+              <p className="text-xs text-gray-500">
+                {new Date(notice.date).toLocaleDateString()}
+              </p>
             </div>
           ))}
         </CardContent>
       </Card>
 
-      {/* Events */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -133,7 +105,8 @@ export function StudentOverviewSection({ user }: StudentOverviewSectionProps) {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {mockEvents.map((event) => (
+          {isLoading && !data && <p className="text-sm text-gray-500">Loading events...</p>}
+          {data?.events?.map((event) => (
             <div key={event.id} className="p-3 bg-green-50 rounded-lg border border-green-200">
               <h3 className="text-gray-900 mb-1">{event.title}</h3>
               <div className="space-y-1 text-sm text-gray-600">
@@ -151,7 +124,6 @@ export function StudentOverviewSection({ user }: StudentOverviewSectionProps) {
         </CardContent>
       </Card>
 
-      {/* Calendar */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -169,7 +141,6 @@ export function StudentOverviewSection({ user }: StudentOverviewSectionProps) {
         </CardContent>
       </Card>
 
-      {/* Routine */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -178,9 +149,8 @@ export function StudentOverviewSection({ user }: StudentOverviewSectionProps) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {/* Day selector */}
           <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
-            {mockRoutine.map((day) => (
+            {data?.routine?.map((day) => (
               <button
                 key={day.day}
                 onClick={() => setSelectedDay(day.day)}
@@ -194,11 +164,9 @@ export function StudentOverviewSection({ user }: StudentOverviewSectionProps) {
               </button>
             ))}
           </div>
-
-          {/* Periods */}
           <div className="space-y-2">
-            {mockRoutine
-              .find((r) => r.day === selectedDay)
+            {data?.routine
+              ?.find((r) => r.day === selectedDay)
               ?.periods.map((period, idx) => (
                 <div
                   key={idx}

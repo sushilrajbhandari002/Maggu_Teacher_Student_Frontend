@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -6,39 +6,43 @@ import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
 import { Calendar, Plus, MapPin, Clock, Edit2, Trash2 } from 'lucide-react';
+import { apiFetch } from '../../lib/api';
 
-const mockEvents = [
-  { 
-    id: 'e1', 
-    title: 'Annual Sports Day', 
-    description: 'Inter-school sports competition featuring various athletic events.',
-    date: '2025-12-15',
-    time: '9:00 AM',
-    location: 'School Sports Ground',
-    type: 'Sports'
-  },
-  { 
-    id: 'e2', 
-    title: 'Science Exhibition', 
-    description: 'Students will showcase their science projects and innovations.',
-    date: '2025-12-20',
-    time: '10:00 AM',
-    location: 'School Auditorium',
-    type: 'Academic'
-  },
-  { 
-    id: 'e3', 
-    title: 'Christmas Celebration', 
-    description: 'Annual Christmas celebration with cultural performances.',
-    date: '2025-12-24',
-    time: '2:00 PM',
-    location: 'Main Hall',
-    type: 'Cultural'
-  },
-];
+interface Event {
+  id: number;
+  title: string;
+  date: string;
+  time: string;
+  venue: string;
+}
 
 export function AdminEventsView() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [events, setEvents] = useState<Event[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    apiFetch<{ events: Event[] }>('/admin/dashboard')
+      .then((data) => setEvents(data.events))
+      .catch(() => setEvents([]))
+      .finally(() => setIsLoading(false));
+  }, []);
+
+  if (isLoading) {
+    return <div className="p-4 text-gray-600">Loading events...</div>;
+  }
+
+  const eventsList = events.map((event) => ({
+    id: event.id.toString(),
+    title: event.title,
+    description: `${event.title} at ${event.venue}`,
+    date: event.date,
+    time: event.time,
+    location: event.venue,
+    type: event.title.toLowerCase().includes('sport') ? 'Sports' : 
+          event.title.toLowerCase().includes('science') || event.title.toLowerCase().includes('exam') ? 'Academic' : 
+          'Cultural',
+  }));
 
   return (
     <div className="space-y-6">
@@ -97,7 +101,7 @@ export function AdminEventsView() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {mockEvents.map((event) => (
+        {eventsList.map((event) => (
           <Card key={event.id} className="p-6">
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-start gap-3 flex-1 min-w-0">

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { User } from '../App';
 import { Button } from './ui/button';
 import { LogOut, Home, Users, CheckSquare, Upload, FileText, UserCircle } from 'lucide-react';
@@ -8,6 +8,8 @@ import { TeacherAttendanceSection } from './teacher/TeacherAttendanceSection';
 import { TeacherUploadSection } from './teacher/TeacherUploadSection';
 import { TeacherExamMarksSection } from './teacher/TeacherExamMarksSection';
 import { TeacherProfileSection } from './teacher/TeacherProfileSection';
+import { apiFetch } from '../lib/api';
+import { TeacherDataProvider, TeacherDashboardData } from './teacher/TeacherDataContext';
 
 interface TeacherDashboardProps {
   user: User;
@@ -19,6 +21,22 @@ type TabType = 'overview' | 'classes' | 'attendance' | 'upload' | 'marks' | 'pro
 
 export function TeacherDashboard({ user, onLogout, onUpdateUser }: TeacherDashboardProps) {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
+  const [dashboardData, setDashboardData] = useState<TeacherDashboardData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchDashboardData = useCallback(() => {
+    setIsLoading(true);
+    setError(null);
+    apiFetch<TeacherDashboardData>(`/teachers/${user.id}/dashboard`)
+      .then(setDashboardData)
+      .catch((err) => setError(err.message ?? 'Failed to load teacher data'))
+      .finally(() => setIsLoading(false));
+  }, [user.id]);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
   const navItems = [
     { id: 'overview' as TabType, icon: Home, label: 'Overview' },
@@ -59,14 +77,27 @@ export function TeacherDashboard({ user, onLogout, onUpdateUser }: TeacherDashbo
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="max-w-7xl mx-auto p-4">
-        {activeTab === 'overview' && <TeacherOverviewSection user={user} />}
-        {activeTab === 'classes' && <TeacherClassesSection user={user} />}
-        {activeTab === 'attendance' && <TeacherAttendanceSection user={user} />}
-        {activeTab === 'upload' && <TeacherUploadSection user={user} />}
-        {activeTab === 'marks' && <TeacherExamMarksSection user={user} />}
-        {activeTab === 'profile' && <TeacherProfileSection user={user} onUpdateUser={onUpdateUser} />}
+        {isLoading && <p className="text-sm text-gray-500">Loading teacher data...</p>}
+        {error && (
+          <div className="text-sm text-red-600 bg-red-50 border border-red-200 p-3 rounded">
+            {error}
+          </div>
+        )}
+        {!isLoading && dashboardData && (
+          <TeacherDataProvider value={dashboardData}>
+            {activeTab === 'overview' && <TeacherOverviewSection user={user} />}
+            {activeTab === 'classes' && <TeacherClassesSection user={user} />}
+            {activeTab === 'attendance' && <TeacherAttendanceSection user={user} />}
+            {activeTab === 'upload' && (
+              <TeacherUploadSection user={user} onRefresh={fetchDashboardData} />
+            )}
+            {activeTab === 'marks' && <TeacherExamMarksSection user={user} />}
+            {activeTab === 'profile' && (
+              <TeacherProfileSection user={user} onUpdateUser={onUpdateUser} />
+            )}
+          </TeacherDataProvider>
+        )}
       </div>
 
       {/* Bottom Navigation */}
